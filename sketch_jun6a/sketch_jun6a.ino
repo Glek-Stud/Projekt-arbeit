@@ -14,23 +14,23 @@ devicename
 #include <Adafruit_INA219.h>  // Library for INA219 Board
 #include <PubSubClient.h>
 #include <Servo.h>
-#include <LiquidCrystal_I2C.h>   // Library for the LCD Display (optional)
+#include <LiquidCrystal_I2C.h>  // Library for the LCD Display (optional)
 
 // Wifi Credentials
 const char* ssid = "THMnet";                    // Your Wi-Fi SSID
 const char* password = "S63rg3pAerUDnUhLtyXg";  // Your Wi-Fi password
 
 // Object definitions
-LiquidCrystal_I2C lcd(0x27,20,4); // LCD Display 4x20, first parameter is the I2C adress
+LiquidCrystal_I2C lcd(0x27, 20, 4);  // LCD Display 4x20, first parameter is the I2C adress
 
 // MQTT Broker Details
 const char* mqtt_server = "test.mosquitto.org";
 // MQTT broker (you can replace it with your MQTT broker IP)
-const char* mqtt_topic_gen = "cesithmcoil2025/nancy-friedberg/friedberg/test";
+const char* mqtt_topic_gen = "cesithmcoil2025/nancy-friedberg/test";
 // Testtopic for Listening
-const char* mqtt_topic_h = "cesithmcoil2025/nancy-friedberg/friedberg/h-angle";
+const char* mqtt_topic_h = "cesithmcoil2025/nancy-friedberg/h-angle";
 // Topic to control Servo 1
-const char* mqtt_topic_v = "cesithmcoil2025/nancy-friedberg/friedberg/v-angle";
+const char* mqtt_topic_v = "cesithmcoil2025/nancy-friedberg/v-angle";
 // Topic to control Servo 2
 const char* mqtt_topic_panel_voltage = "cesithmcoil2025/nancy-friedberg/friedberg/panelvoltage";
 // Topic to send values
@@ -86,6 +86,9 @@ void reconnect() {
     Serial.print(".");
     delay(1000);
   }
+  client.subscribe(mqtt_topic_gen);
+  client.subscribe(mqtt_topic_h);
+  client.subscribe(mqtt_topic_v);
   Serial.println("MQTT Connected!");
   // while (!client.connected())  //Loop until reconnected
   // {
@@ -122,11 +125,10 @@ void send_mqtt_data(void) {
   }
 }
 
-void send_data_lcd(void)
-{
+void send_data_lcd(void) {
   lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("Test Line 1"); // Print on LCD Display
+  lcd.setCursor(0, 0);
+  lcd.print("Test Line 1");  // Print on LCD Display
 }
 
 // MQTT Callback function to listen to messages from the broker
@@ -167,7 +169,7 @@ void setup() {
 
   // Initialize LCD Display 4x20
   lcd.init();
-  lcd.begin(20,4);
+  lcd.begin(20, 4);
   lcd.backlight();
   lcd.clear();
   // Initialization LCD Display END
@@ -192,7 +194,8 @@ void setup() {
 
   //Initialize MQTT
   client.setServer(mqtt_server, 1883);  // Set the MQTT server
-  client.setCallback(mqttcallback);     // Set the callback function for incoming messages
+
+  client.setCallback(mqttcallback);  // Set the callback function for incoming messages
 
   //Check little iffy.
   while (!client.connect(HOSTNAME)) {
@@ -200,6 +203,9 @@ void setup() {
     delay(1000);
   }
   Serial.println("MQTT Connected!");
+  client.subscribe(mqtt_topic_gen);
+  client.subscribe(mqtt_topic_h);
+  client.subscribe(mqtt_topic_v);
   cs_counter = millis();
   mqp_counter = millis();
   mqs_counter = millis();
@@ -243,8 +249,7 @@ void loop() {
     send_mqtt_data();
   }
 
-  if (millis() - lcd_counter > 500)
-  {
+  if (millis() - lcd_counter > 500) {
     lcd_counter = millis();
     send_data_lcd();
   }
