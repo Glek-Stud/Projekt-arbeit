@@ -24,17 +24,17 @@ const char* password = "S63rg3pAerUDnUhLtyXg";    // Your Wi-Fi password
 // MQTT Broker Details 
 const char* mqtt_server = "test.mosquitto.org";   
 // MQTT broker (you can replace it with your MQTT broker IP) 
-const char* mqtt_topic_gen = "cesithmcoil2025/sunergy/Friedberg/test";                       
+const char* mqtt_topic_gen = "cesithmcoil2025/nancy-friedberg/friedberg/test";                       
 // Testtopic for Listening 
-const char* mqtt_topic_h = "cesithmcoil2025/sunergy/Friedberg/angle-h";        
+const char* mqtt_topic_h = "cesithmcoil2025/nancy-friedberg/friedberg/h-angle";        
 // Topic to control Servo 1 
-const char* mqtt_topic_v = "cesithmcoil2025/sunergy/Friedberg/angle-v";        
+const char* mqtt_topic_v = "cesithmcoil2025/nancy-friedberg/friedberg/v-angle";        
 // Topic to control Servo 2 
-const char* mqtt_topic_panel_voltage = "cesithmcoil2025/sunergy/Friedberg/panelvoltage";     
+const char* mqtt_topic_panel_voltage = "cesithmcoil2025/nancy-friedberg/friedberg/panelvoltage";     
 // Topic to send values 
-const char* mqtt_topic_panel_current = "cesithmcoil2025/sunergy/Friedberg/panelcurrent";     
+const char* mqtt_topic_panel_current = "cesithmcoil2025/nancy-friedberg/friedberg/panelcurrent";     
 // Topic to send values 
-const char* mqtt_topic_panel_power = "cesithmcoil2025/sunergy/Friedberg/panelpower";     
+const char* mqtt_topic_panel_power = "cesithmcoil2025/nancy-friedberg/friedberg/panelpower";     
 // Topic to send values 
 const char* mqtt_announce = "cesithmcoil2025/announcement";                  
 // Topic to send Announcements 
