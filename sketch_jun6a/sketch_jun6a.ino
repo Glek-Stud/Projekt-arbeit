@@ -28,9 +28,9 @@ const char* mqtt_server = "test.mosquitto.org";
 // MQTT broker (you can replace it with your MQTT broker IP)
 const char* mqtt_topic_gen = "cesithmcoil2025/nancy-friedberg/test";
 // Testtopic for Listening
-const char* mqtt_topic_h = "cesithmcoil2025/nancy-friedberg/h-angle";
+const char* mqtt_topic_h = "cesithmcoil2025/nancy-friedberg/friedberg/h-angle";
 // Topic to control Servo 1
-const char* mqtt_topic_v = "cesithmcoil2025/nancy-friedberg/v-angle";
+const char* mqtt_topic_v = "cesithmcoil2025/nancy-friedberg/friedberg/v-angle";
 // Topic to control Servo 2
 const char* mqtt_topic_panel_voltage = "cesithmcoil2025/nancy-friedberg/friedberg/panelvoltage";
 // Topic to send values
@@ -53,7 +53,14 @@ float power_mW = 0;
 char value[10] = "";
 char msg_out[20] = "";
 char msg_in[20] = "";
+char message_val[50] = "";
+int mq_hval = 0;
+int mq_vval = 0;
 int t = 0;
+int current_flag = 0;
+const float MOVE_SPEED_DPS = 70.0f;
+unsigned long motor_stepInterval = (unsigned long)(1000.0f / max(MOVE_SPEED_DPS, 0.1f));
+//const unsigned long CHANGE_INTERVAL = 2000;
 
 
 
@@ -68,11 +75,14 @@ Adafruit_INA219 ina219;
 PubSubClient client(wifiClient);
 Servo myservo_v;
 Servo myservo_h;
+int curr_servo_v = 0;
+int curr_servo_h = 0;
 
 unsigned long cs_counter;
 unsigned long mqp_counter;
 unsigned long mqs_counter;
 unsigned long lcd_counter;
+unsigned long motor_counter;
 
 void reconnect() {
   Serial.print("checking wifi...");
@@ -90,27 +100,6 @@ void reconnect() {
   client.subscribe(mqtt_topic_h);
   client.subscribe(mqtt_topic_v);
   Serial.println("MQTT Connected!");
-  // while (!client.connected())  //Loop until reconnected
-  // {
-  //   if (client.connect(HOSTNAME)) {
-  //     // Publish Announcement
-  //     client.publish(mqtt_announce, HOSTNAME);
-  //     // Publish Values
-  //     dtostrf(loadvoltage, 5, 2, msg_out);
-  //     client.publish(mqtt_topic_panel_voltage, msg_out);
-  //     dtostrf(current_mA, 5, 2, msg_out);
-  //     client.publish(mqtt_topic_panel_current, msg_out);
-  //     dtostrf(power_mW, 5, 2, msg_out);
-  //     client.publish(mqtt_topic_panel_power, msg_out);
-  //     // resubscribe to the topics for the solar tracker
-  //     client.subscribe(mqtt_topic_gen);  // Subscribe to the general topics
-  //   } else {
-  //     Serial.print("Failed");
-  //     //Serial.print(client.state());
-  //     Serial.println(" Trying again in 5 seconds...");
-  //     //delay(5000);
-  //   }
-  // }
 }
 
 void send_mqtt_data(void) {
@@ -126,21 +115,71 @@ void send_mqtt_data(void) {
 }
 
 void send_data_lcd(void) {
+  // if (current_flag) {
+  //   lcd.clear();
+  //   lcd.setCursor(0, 0);
+  //   lcd.print("Current Sensor Not Working");
+  //   lcd.setCursor(0, 1);
+  //   lcd.print("Connecting to MQTT");
+  // } else {
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Test Line 1");  // Print on LCD Display
+  lcd.print(busvoltage);  // Print on LCD Display
+  lcd.print(",");
+  lcd.print(current_mA);
+  lcd.print(",");
+  lcd.print(power_mW);
+  lcd.setCursor(0, 1);
+  lcd.print(message_val);
+  //  }
 }
 
 // MQTT Callback function to listen to messages from the broker
 void mqttcallback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
+  char temp[10] = { 0 };
+  if (!strcmp(topic, mqtt_topic_gen)) {
+    for (int i = 0; i < 50; i++) {
+      message_val[i] = 0;
+    }
+    for (int i = 0; i < length; i++) {
+      message_val[i] = (char)payload[i];
+    }
+    message_val[i++] = '\0';
+    Serial.println(message_val);
   }
-  Serial.println();
+  if (!strcmp(topic, mqtt_topic_h)) {
+    for (int i = 0; i < length; i++) {
+      temp[i] = (char)payload[i];
+    }
+    temp[i++] = '\0';
+    mq_hval = atoi(temp);
+    Serial.println(mq_hval);
+  }
+  if (!strcmp(topic, mqtt_topic_v)) {
+    for (int i = 0; i < length; i++) {
+      temp[i] = (char)payload[i];
+    }
+    temp[i++] = '\0';
+    mq_vval = atoi(temp);
+    Serial.println(mq_vval);
+  }
 }
+
+// void updateServo(Servo& servo,
+//                  int currentAng,
+//                  int targetAng,
+//                  unsigned long lastStep,
+//                  float speedDPS) {
+//   if (currentAng == targetAng) return;
+//   unsigned long stepInterval = (unsigned long)(1000.0f / max(speedDPS, 0.1f));
+//   unsigned long now = millis();
+//   if (now - lastStep < stepInterval) return;
+
+//   int dir = (targetAng > currentAng) ? 1 : -1;
+//   currentAng += dir;
+//   servo.write(currentAng);
+//   lastStep = now;
+// }
 
 
 // Setup Function --------------------------------------------------------
@@ -210,8 +249,7 @@ void setup() {
   mqp_counter = millis();
   mqs_counter = millis();
   lcd_counter = millis();
-  //delay(1000);
-  // Initialization of MQTT END
+  motor_counter = millis();
 }
 
 // Main Program ----------------------------------------------------------
@@ -222,17 +260,6 @@ void loop() {
   {
     reconnect();
   }
-
-  // // Publish Values
-  //     dtostrf(loadvoltage,5,2,msg_out);
-  //     client.publish(mqtt_topic_panel_voltage, msg_out);
-  //     dtostrf(current_mA,5,2,msg_out);
-  //     client.publish(mqtt_topic_panel_current, msg_out);
-  //     dtostrf(power_mW,5,2,msg_out);
-  //     client.publish(mqtt_topic_panel_power, msg_out);
-  // client.loop();  // Listen for incoming MQTT messages
-  // //MQTT Test END
-
 
   // Read Sensor Data every 100ms
   if (millis() - cs_counter > 100) {
@@ -252,5 +279,21 @@ void loop() {
   if (millis() - lcd_counter > 500) {
     lcd_counter = millis();
     send_data_lcd();
+  }
+
+  if (millis() - motor_counter > motor_stepInterval) {
+    motor_counter = millis();
+    //Serial.println(mq_vval);
+    //Serial.println(mq_hval);
+    if (curr_servo_v != mq_vval) {
+      int dir = (mq_vval > curr_servo_v) ? 1 : -1;
+      curr_servo_v += dir;
+      myservo_v.write(curr_servo_v);
+    }
+    if (curr_servo_h != mq_hval) {
+      int dir2 = (mq_hval > curr_servo_h) ? 1 : -1;
+      curr_servo_h += dir2;
+      myservo_h.write(curr_servo_h);
+    }
   }
 }
