@@ -182,8 +182,50 @@ void mqttcallback(char* topic, byte* payload, unsigned int length) {
 // }
 
 
+uint16_t bestH   = 0;     
+uint16_t bestV   = 0;     
+float    bestPow = -1.0;  
+
+float checkP(uint16_t hDeg, uint16_t vDeg){
+  myservo_h.write(hDeg);
+  myservo_v.write(vDeg);
+  delay(1000);                          
+
+  float busV    = ina219.getBusVoltage_V();
+  float shuntmV = ina219.getShuntVoltage_mV();
+  float current = ina219.getCurrent_mA();
+  float loadV   = busV + shuntmV / 1000.0;
+
+  return current;              
+}
+
+void scanDg(){
+
+  const uint16_t h_max = 180;
+  const uint16_t v_max = 90;
+  const uint8_t  vstep  = 20;
+  const uint8_t  hstep  = 30;
+
+  for (uint16_t h = 0; h <= h_max ; h += hstep) {
+    for (uint16_t v = 0; v <= v_max; v += vstep) {
+
+      float p = checkP(h, v);
+
+      if (p > bestPow) {               
+        bestPow = p;
+        bestH   = h;
+        bestV   = v;
+      }
+    }
+  }
+
+  myservo_h.write(bestH);
+  myservo_v.write(bestV);
+}
+
 // Setup Function --------------------------------------------------------
 void setup() {
+
   Serial.begin(115200);  //define the baudrate of the serial interface to the
   while (!Serial) {
     delay(1000);  // wait for serial port to connect. Needed for native USB port only
@@ -250,6 +292,8 @@ void setup() {
   mqs_counter = millis();
   lcd_counter = millis();
   motor_counter = millis();
+
+  scanDg();
 }
 
 // Main Program ----------------------------------------------------------
