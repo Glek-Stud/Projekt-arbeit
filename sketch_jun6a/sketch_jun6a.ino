@@ -60,6 +60,9 @@ int t = 0;
 int current_flag = 0;
 const float MOVE_SPEED_DPS = 70.0f;
 unsigned long motor_stepInterval = (unsigned long)(1000.0f / max(MOVE_SPEED_DPS, 0.1f));
+uint16_t bestH   = 0;     
+uint16_t bestV   = 0;     
+float    bestPow = -1.0;  
 //const unsigned long CHANGE_INTERVAL = 2000;
 
 
@@ -153,6 +156,10 @@ void mqttcallback(char* topic, byte* payload, unsigned int length) {
     }
     temp[i++] = '\0';
     mq_hval = atoi(temp);
+    if (mq_hval >=180)
+    {
+      mq_hval = 180;
+    }
     Serial.println(mq_hval);
   }
   if (!strcmp(topic, mqtt_topic_v)) {
@@ -161,25 +168,52 @@ void mqttcallback(char* topic, byte* payload, unsigned int length) {
     }
     temp[i++] = '\0';
     mq_vval = atoi(temp);
+    if (mq_vval >=180)
+    {
+      mq_vval = 180;
+    }
     Serial.println(mq_vval);
   }
 }
 
-// void updateServo(Servo& servo,
-//                  int currentAng,
-//                  int targetAng,
-//                  unsigned long lastStep,
-//                  float speedDPS) {
-//   if (currentAng == targetAng) return;
-//   unsigned long stepInterval = (unsigned long)(1000.0f / max(speedDPS, 0.1f));
-//   unsigned long now = millis();
-//   if (now - lastStep < stepInterval) return;
+float checkP(uint16_t hDeg, uint16_t vDeg){
+  myservo_h.write(hDeg);
+  myservo_v.write(vDeg);
+  delay(1000);                          
 
-//   int dir = (targetAng > currentAng) ? 1 : -1;
-//   currentAng += dir;
-//   servo.write(currentAng);
-//   lastStep = now;
-// }
+  float busV    = ina219.getBusVoltage_V();
+  float shuntmV = ina219.getShuntVoltage_mV();
+  float current = ina219.getCurrent_mA();
+  float loadV   = busV + shuntmV / 1000.0;
+
+  return current;              
+}
+
+void scanDg(){
+
+  const uint16_t h_max = 180;
+  const uint16_t v_max = 90;
+  const uint8_t  vstep  = 10;
+  const uint8_t  hstep  = 30;
+
+  for (uint16_t h = 0; h <= h_max ; h += hstep) {
+    for (uint16_t v = 0; v <= v_max; v += vstep) {
+
+      float p = checkP(h, v);
+
+      if (p > bestPow) {               
+        bestPow = p;
+        bestH   = h;
+        bestV   = v;
+      }
+    }
+  }
+
+  myservo_h.write(bestH);
+  myservo_v.write(bestV);
+}
+
+
 
 
 // Setup Function --------------------------------------------------------
@@ -207,10 +241,10 @@ void setup() {
   }
 
   // Initialize LCD Display 4x20
-  lcd.init();
-  lcd.begin(20, 4);
-  lcd.backlight();
-  lcd.clear();
+  // lcd.init();
+  // lcd.begin(20, 4);
+  // lcd.backlight();
+  // lcd.clear();
   // Initialization LCD Display END
 
   //Initialize the Wifi Network
@@ -245,6 +279,7 @@ void setup() {
   client.subscribe(mqtt_topic_gen);
   client.subscribe(mqtt_topic_h);
   client.subscribe(mqtt_topic_v);
+  scanDg();
   cs_counter = millis();
   mqp_counter = millis();
   mqs_counter = millis();
@@ -268,29 +303,36 @@ void loop() {
     current_mA = ina219.getCurrent_mA();
     loadvoltage = busvoltage + (shuntvoltage / 1000);
     power_mW = loadvoltage * current_mA;
+    Wire.endTransmission(true);
     cs_counter = millis();
   }
 
   if (millis() - mqp_counter > 1000) {
     mqp_counter = millis();
+    Serial.print(shuntvoltage);
+    Serial.print(",");
+    Serial.print(busvoltage);
+    Serial.print(",");
+    Serial.print(current_mA);
+    Serial.print(";");
+    Serial.print(power_mW);
+    Serial.print("\n");
     send_mqtt_data();
   }
 
   if (millis() - lcd_counter > 500) {
     lcd_counter = millis();
-    send_data_lcd();
+    //send_data_lcd();
   }
 
-  if (millis() - motor_counter > motor_stepInterval) {
+  if (millis() - motor_counter > 30 ) {
     motor_counter = millis();
-    //Serial.println(mq_vval);
-    //Serial.println(mq_hval);
-    if (curr_servo_v != mq_vval) {
+    if (curr_servo_v != mq_vval && mq_vval!=0 ) {
       int dir = (mq_vval > curr_servo_v) ? 1 : -1;
       curr_servo_v += dir;
       myservo_v.write(curr_servo_v);
     }
-    if (curr_servo_h != mq_hval) {
+    if (curr_servo_h != mq_hval && mq_hval!=0 ) {
       int dir2 = (mq_hval > curr_servo_h) ? 1 : -1;
       curr_servo_h += dir2;
       myservo_h.write(curr_servo_h);
